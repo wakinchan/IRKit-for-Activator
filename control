@@ -1,0 +1,9 @@
+Package: com.kindadev.activator.irkit
+Name: IRKit for Activator
+Depends: libactivator (>= 1.8.3), mobilesubstrate
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Activator to send a signal to IRKit. Use IRKit Simple.app internal function.
+Maintainer: kinda
+Author: kinda
+Section: Addons
