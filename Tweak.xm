@@ -15,17 +15,17 @@
 #import "BulletinBoard.h"
 
 #define PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.plist"
-#define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.image.plist"
+#define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.images.plist"
 #define BundleIdentifier @"jp.maaash.simpleremote"
 
 @interface IRKitforActivator : NSObject <LAListener> {
     NSArray *_dictionary;
-    NSArray *_images;
     NSMutableArray *_md5Lists;
 }
 - (void)register;
 - (void)getSignals;
 - (void)sendSignal:(NSString *)signalName;
+- (UIImage *)getSignalImage:(NSString *)listenerName;
 - (NSString *)getSignalTitile:(NSString *)listenerName;
 @end
 
@@ -62,7 +62,7 @@ static IRKitforActivator *irkit = nil;
 {
     BBBulletinRequest *bulletin = [[%c(BBBulletinRequest) alloc] init];
     bulletin.title     = [self getSignalTitile:listenerName];
-    bulletin.message   = @"sent successfully!"; 
+    bulletin.message   = success ? @"send successfully!" : @"send failed!"; 
     bulletin.sectionID = BundleIdentifier;
     [(SBBulletinBannerController *)[%c(SBBulletinBannerController) sharedInstance] observer:nil addBulletin:bulletin forFeed:2];
 }
@@ -85,6 +85,18 @@ static IRKitforActivator *irkit = nil;
         }
     }
     return title;
+}
+
+- (UIImage *)getSignalImage:(NSString *)listenerName
+{
+    NSData *data = nil;
+    NSArray *images = [[NSArray alloc] initWithContentsOfFile:IMAGE_PREFS_PATH];
+    for (unsigned int i = 0; i < [_dictionary count]; i++) {
+        if ([listenerName isEqualToString:_md5Lists[i]]) {
+            data = images[i];
+        }
+    }
+    return [[UIImage alloc] initWithData:data];
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event forListenerName:(NSString *)listenerName
@@ -115,12 +127,12 @@ static IRKitforActivator *irkit = nil;
 
 - (UIImage *)activator:(LAActivator *)activator requiresIconForListenerName:(NSString *)listenerName scale:(CGFloat)scale
 {
-    return [UIImage _applicationIconImageForBundleIdentifier:BundleIdentifier format:0 scale:[UIScreen mainScreen].scale];
+    return [[self getSignalImage:listenerName] makeThumbnailOfSize:CGSizeMake(18*scale,18*scale)];
 }
 
 - (UIImage *)activator:(LAActivator *)activator requiresSmallIconForListenerName:(NSString *)listenerName scale:(CGFloat)scale
 {
-    return [UIImage _applicationIconImageForBundleIdentifier:BundleIdentifier format:0 scale:[UIScreen mainScreen].scale];
+    return [[self getSignalImage:listenerName] makeThumbnailOfSize:CGSizeMake(18*scale,18*scale)];
 }
 @end
 

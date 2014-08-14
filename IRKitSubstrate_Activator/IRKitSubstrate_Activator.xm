@@ -11,10 +11,14 @@
 #import "../NSString+Hashes.h"
 
 #define PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.plist"
-#define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.image.plist"
+#define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.images.plist"
 #define MD5_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.md5.plist"
+#define SIGNALS_DIRECTORY [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/IRLauncher/"]
+//@"/Library/Application Support/"
 
-@interface SSSettingsViewController : UITableViewController
+@interface SSSettingsViewController : UITableViewController <UIActionSheetDelegate>
+- (void)exportIRKitSettings;
+- (void)exportOSXLauncherSettings;
 @end
 
 static inline UIImage * MakeCornerRoundImage(UIImage *image)
@@ -38,14 +42,36 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
 {
     %orig;
     UIButton* exportBtn = [UIButton buttonWithType:101]; 
-    [exportBtn addTarget:self action:@selector(exportIRKitSettings:) forControlEvents:UIControlEventTouchUpInside];
+    [exportBtn addTarget:self action:@selector(handleExportTapped:) forControlEvents:UIControlEventTouchUpInside];
     [exportBtn setTitle:@"Export" forState:UIControlStateNormal];
     UIBarButtonItem* exportItem = [[UIBarButtonItem alloc] initWithCustomView:exportBtn];
     self.navigationItem.rightBarButtonItem = exportItem;
 }
 
 %new
-- (void)exportIRKitSettings:(id)sender
+- (void)handleExportTapped:(id)sender
+{
+    UIActionSheet *actionSheet = [[UIActionSheet alloc]
+                                  initWithTitle:@"Export settings:"
+                                  delegate:self
+                                  cancelButtonTitle:@"Cancel"
+                                  destructiveButtonTitle:nil
+                                  otherButtonTitles:@"for Activator", @"for IRLauncher (OSX)", nil];
+    [actionSheet showInView:self.view];
+}
+
+%new
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    switch (buttonIndex) {
+        case 0: [self exportIRKitSettings];       break;
+        case 1: [self exportOSXLauncherSettings]; break;
+        default: break;
+    }
+}
+
+%new
+- (void)exportIRKitSettings
 {
     IRSignals *_signals = [[%c(IRSignals) alloc] init];
     [_signals loadFromStandardUserDefaultsKey:@"signals"];
@@ -57,27 +83,72 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
         IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
         asDictionary[i] = [_signal asDictionary];
         md5Lists[i] = [asDictionary[i][@"name"] md5];
+        NSString *type = asDictionary[i][@"custom"][@"type"];
 
         UIImage *image = [UIImage new];
-        NSString *type = asDictionary[i][@"custom"][@"type"];
         if ([type isEqualToString:@"preset"]) {
             NSString *name = asDictionary[i][@"custom"][@"name"];
             image = [UIImage imageNamed:[NSString stringWithFormat:@"btn_icon_120_%@", name]];
             
         } else if ([type isEqualToString:@"album"]) {
             NSString *dir = asDictionary[i][@"custom"][@"dir"];
-            NSString *path = [NSString stringWithFormat:@"%@/120.png", dir];
+            if ([dir hasPrefix:@"/var/mobile/Applications/"]) {
+                dir = [[dir componentsSeparatedByString:@"/"] lastObject];
+            }
+            NSString *path = [NSString stringWithFormat:@"%@/%@/120.png", [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"], dir];
             image = MakeCornerRoundImage([UIImage imageWithContentsOfFile:path]);
         }
-        NSData *data = [[[NSData alloc] initWithData:UIImagePNGRepresentation(image)] autorelease];
-        images[i] = data;
+        images[i] = [[[NSData alloc] initWithData:UIImagePNGRepresentation(image)] autorelease];;
     }
 
     [asDictionary writeToFile:PREFS_PATH atomically:YES];
-    [images writeToFile:IMAGE_PREFS_PATH atomically:YES]; // xxx: do not use.
+    [images writeToFile:IMAGE_PREFS_PATH atomically:YES];
     [md5Lists writeToFile:MD5_PREFS_PATH atomically:YES];
 
-    [[[UIAlertView alloc] initWithTitle:@"Export `IRKit for Activator` settings." message:nil delegate:nil cancelButtonTitle:@"success." otherButtonTitles:nil] show];
+    [[[UIAlertView alloc] initWithTitle:@"Export!" message:@"Output complete the data to be used to IRKit for Activator." delegate:nil cancelButtonTitle:@"Yep!" otherButtonTitles:nil] show];
+}
+
+// https://github.com/irkit/osx-launcher/blob/master/IRLauncher/ILFileStore.m
+%new
+- (void)exportOSXLauncherSettings
+{
+    IRSignals *_signals = [[%c(IRSignals) alloc] init];
+    [_signals loadFromStandardUserDefaultsKey:@"signals"];
+
+    for (unsigned int i = 0; i < [_signals countOfSignals]; i++) {
+        IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
+
+        NSError **error = nil;
+
+        NSCharacterSet* illegalFileNameCharacters = [NSCharacterSet characterSetWithCharactersInString: @"/\\?%*|\"<>"];
+        NSString *safename = [[_signal.name componentsSeparatedByCharactersInSet: illegalFileNameCharacters] componentsJoinedByString: @""];
+
+        NSData *json = [NSJSONSerialization dataWithJSONObject:[_signal asDictionary] options:NSJSONWritingPrettyPrinted error:error];
+        if (*error) {
+            NSLog( @"failed with error: %@", *error );
+        }
+
+        BOOL created = [[NSFileManager defaultManager] createDirectoryAtPath:SIGNALS_DIRECTORY
+                                                 withIntermediateDirectories:YES
+                                                                  attributes:nil
+                                                                       error:error];
+        if (!created) {
+            NSLog( @"createDirectoryAtPath:... failed with error: %@", *error );
+        }
+
+        NSString *basename = [NSString stringWithFormat: @"%@.json", safename];
+        NSString *file     = [SIGNALS_DIRECTORY stringByAppendingPathComponent: basename];
+
+        // doesn't overwrite file
+        BOOL success = [json writeToURL:[NSURL fileURLWithPath: file]
+                                options:NSDataWritingAtomic
+                                  error:error];
+        if (!success) {
+            NSLog( @"doesn't overwrite file:... %@", file );
+        }
+    }
+
+    [[[UIAlertView alloc] initWithTitle:@"Export!" message:@"Output complete the data to be used to IRLauncher. Please copy json files and use on your Mac.\n\n/var/mobile/Applications/Simple.app/Documents/IRLauncher/*.json -> Your Mac ~/.irkit.d/signals/" delegate:nil cancelButtonTitle:@"Yep!" otherButtonTitles:nil] show];
 }
 %end
 
@@ -95,8 +166,7 @@ static inline __attribute__((constructor)) void init()
                 for (unsigned int i = 0; i < [_signals countOfSignals]; i++) {
                     IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
                     asDictionary[i] = [_signal asDictionary];
-                    NSString *md5 = [asDictionary[i][@"name"] md5];
-                    if ([dict[@"md5"] isEqualToString:md5]) {
+                    if ([dict[@"md5"] isEqualToString:[asDictionary[i][@"name"] md5]]) {
                         index = i;
                     }
                 }

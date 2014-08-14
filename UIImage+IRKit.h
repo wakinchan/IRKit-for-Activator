@@ -1,6 +1,6 @@
 //
 //  UIImage+IRKit.h
-//  IRKit for ProWidgets
+//  IRKit for Activator
 //
 //  Created by kinda on 15.04.2014.
 //  Copyright (c) 2014 kinda. All rights reserved.
