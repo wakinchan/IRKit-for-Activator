@@ -1,4 +1,4 @@
-export TARGET = iphone:clang
+export TARGET = iphone:clang::7.0
 export ARCHS = armv7 arm64
 export GO_EASY_ON_ME = 1
 

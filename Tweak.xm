@@ -41,9 +41,10 @@ static IRKitforActivator *irkit = nil;
     irkit = [[self alloc] init];
     [irkit register];
 
+    __weak IRKitforActivator *weakSelf = irkit;
     [OBJCIPC registerIncomingMessageFromAppHandlerForMessageName:@"IRKitSubstrate_Activator_UpdateListeners" handler:^NSDictionary *(NSDictionary *dict) {
-        [irkit removeCurrentListeners];
-        [irkit register];
+        [weakSelf removeCurrentListeners];
+        [weakSelf register];
         return nil;
     }];
 }
