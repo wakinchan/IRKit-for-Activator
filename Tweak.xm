@@ -6,6 +6,8 @@
 //  Copyright (c) 2014 kinda. All rights reserved.
 //
 
+%config(generator=internal)
+
 #import <libactivator/libactivator.h>
 #import <objcipc/objcipc.h>
 #import "Headers.h"
