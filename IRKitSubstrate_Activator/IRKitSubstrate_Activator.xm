@@ -100,7 +100,7 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
             NSString *path = [NSString stringWithFormat:@"%@/%@/120.png", [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"], dir];
             image = MakeCornerRoundImage([UIImage imageWithContentsOfFile:path]);
         }
-        images[i] = [[NSData alloc] initWithData:UIImagePNGRepresentation(image)];;
+        images[i] = [[NSData alloc] initWithData:UIImagePNGRepresentation(image)];
     }
 
     [asDictionary writeToFile:PREFS_PATH atomically:YES];
