@@ -98,7 +98,7 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
             NSString *path = [NSString stringWithFormat:@"%@/%@/120.png", [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"], dir];
             image = MakeCornerRoundImage([UIImage imageWithContentsOfFile:path]);
         }
-        images[i] = [[[NSData alloc] initWithData:UIImagePNGRepresentation(image)] autorelease];;
+        images[i] = [[NSData alloc] initWithData:UIImagePNGRepresentation(image)];;
     }
 
     [asDictionary writeToFile:PREFS_PATH atomically:YES];
@@ -118,22 +118,22 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
     for (unsigned int i = 0; i < [_signals countOfSignals]; i++) {
         IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
 
-        NSError **error = nil;
+        NSError *error = nil;
 
         NSCharacterSet* illegalFileNameCharacters = [NSCharacterSet characterSetWithCharactersInString: @"/\\?%*|\"<>"];
         NSString *safename = [[_signal.name componentsSeparatedByCharactersInSet: illegalFileNameCharacters] componentsJoinedByString: @""];
 
-        NSData *json = [NSJSONSerialization dataWithJSONObject:[_signal asDictionary] options:NSJSONWritingPrettyPrinted error:error];
-        if (*error) {
-            NSLog( @"failed with error: %@", *error );
+        NSData *json = [NSJSONSerialization dataWithJSONObject:[_signal asDictionary] options:NSJSONWritingPrettyPrinted error:&error];
+        if (error) {
+            NSLog( @"failed with error: %@", error );
         }
 
         BOOL created = [[NSFileManager defaultManager] createDirectoryAtPath:SIGNALS_DIRECTORY
                                                  withIntermediateDirectories:YES
                                                                   attributes:nil
-                                                                       error:error];
+                                                                       error:&error];
         if (!created) {
-            NSLog( @"createDirectoryAtPath:... failed with error: %@", *error );
+            NSLog( @"createDirectoryAtPath:... failed with error: %@", error );
         }
 
         NSString *basename = [NSString stringWithFormat: @"%@.json", safename];
@@ -142,7 +142,7 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
         // doesn't overwrite file
         BOOL success = [json writeToURL:[NSURL fileURLWithPath: file]
                                 options:NSDataWritingAtomic
-                                  error:error];
+                                  error:&error];
         if (!success) {
             NSLog( @"doesn't overwrite file:... %@", file );
         }
