@@ -1,7 +1,7 @@
 Package: com.kindadev.activator.irkit
 Name: IRKit for Activator
 Depends: libactivator (>= 1.8.3), cc.tweak.libobjcipc, mobilesubstrate
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm
 Description: Activator to send a signal to IRKit. Use IRKit Simple.app internal function.
 Depiction: http://kindadev.com/cydia/irkitforactivator.html
