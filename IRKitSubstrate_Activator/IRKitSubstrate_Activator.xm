@@ -2,7 +2,7 @@
 //  IRKitSubstrate_Activator.xm
 //  IRKit for Activator
 //
-//  Created by kinda on 15.04.2014.
+//  Created by kinda on 10.08.2014.
 //  Copyright (c) 2014 kinda. All rights reserved.
 //
 
