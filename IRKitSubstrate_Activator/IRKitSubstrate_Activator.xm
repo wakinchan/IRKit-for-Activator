@@ -107,6 +107,7 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
     [images writeToFile:IMAGE_PREFS_PATH atomically:YES];
     [md5Lists writeToFile:MD5_PREFS_PATH atomically:YES];
 
+    [OBJCIPC sendMessageToSpringBoardWithMessageName:@"IRKitSubstrate_Activator_UpdateListeners" dictionary:nil replyHandler:nil];
     [[[UIAlertView alloc] initWithTitle:@"Export!" message:@"Output complete the data to be used to IRKit for Activator." delegate:nil cancelButtonTitle:@"Yep!" otherButtonTitles:nil] show];
 }
 

@@ -26,6 +26,7 @@
 }
 - (void)register;
 - (void)getSignals;
+- (void)removeCurrentListeners;
 - (void)sendSignal:(NSString *)signalName;
 - (UIImage *)getSignalImage:(NSString *)listenerName;
 - (NSString *)getSignalTitile:(NSString *)listenerName;
@@ -39,6 +40,13 @@ static IRKitforActivator *irkit = nil;
 {
     irkit = [[self alloc] init];
     [irkit register];
+
+    __weak IRKitforActivator *weakSelf = irkit;
+    [OBJCIPC registerIncomingMessageFromAppHandlerForMessageName:@"IRKitSubstrate_Activator_UpdateListeners" handler:^NSDictionary *(NSDictionary *dict) {
+        [weakSelf removeCurrentListeners];
+        [weakSelf register];
+        return nil;
+    }];
 }
 
 - (void)register
@@ -58,6 +66,17 @@ static IRKitforActivator *irkit = nil;
 {
     NSArray *dictionary = [[NSArray alloc] initWithContentsOfFile:PREFS_PATH];
     _dictionary = [dictionary copy];
+}
+
+- (void)removeCurrentListeners
+{
+    if (![LASharedActivator isRunningInsideSpringBoard])
+        return;
+    for (NSString *name in _md5Lists) {
+        if ([LASharedActivator hasListenerWithName:name]) {
+            [LASharedActivator unregisterListenerWithName:name];
+        }
+    }
 }
 
 - (void)showBanner:(BOOL)success listenerName:(NSString *)listenerName
