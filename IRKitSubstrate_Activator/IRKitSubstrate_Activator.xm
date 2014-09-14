@@ -11,33 +11,16 @@
 #import <objcipc/objcipc.h>
 #import "../Headers.h"
 #import "../NSString+Hashes.h"
+#import "../UIImage+IRKit.h"
 
 #define PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.plist"
 #define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.images.plist"
-#define MD5_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.md5.plist"
 #define SIGNALS_DIRECTORY [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/IRLauncher/"]
-//@"/Library/Application Support/"
 
 @interface SSSettingsViewController : UITableViewController <UIActionSheetDelegate>
 - (void)exportIRKitSettings;
 - (void)exportOSXLauncherSettings;
 @end
-
-static inline UIImage * MakeCornerRoundImage(UIImage *image)
-{
-    CALayer *imageLayer = [CALayer layer];
-    imageLayer.frame = CGRectMake(0, 0, 120, 120);
-    imageLayer.contents = (id)image.CGImage;
-    imageLayer.masksToBounds = YES;
-    imageLayer.cornerRadius = 25.0f;
-
-    UIGraphicsBeginImageContext(imageLayer.frame.size);
-    [imageLayer renderInContext:UIGraphicsGetCurrentContext()];
-    UIImage *roundedImage = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-
-    return roundedImage;
-}
 
 %hook SSSettingsViewController
 - (void)viewDidLoad
@@ -75,15 +58,15 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
 %new
 - (void)exportIRKitSettings
 {
-    IRSignals *_signals = [[%c(IRSignals) alloc] init];
-    [_signals loadFromStandardUserDefaultsKey:@"signals"];
+    IRSignals *signals = [[%c(IRSignals) alloc] init];
+    [signals loadFromStandardUserDefaultsKey:@"signals"];
     
     NSMutableArray *asDictionary = [NSMutableArray array];
     NSMutableArray *images = [NSMutableArray array];
     NSMutableArray *md5Lists = [NSMutableArray array];
-    for (unsigned int i = 0; i < [_signals countOfSignals]; i++) {
-        IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
-        asDictionary[i] = [_signal asDictionary];
+    for (unsigned int i = 0; i < [signals countOfSignals]; i++) {
+        IRSignal *signal =  [signals objectInSignalsAtIndex:i];
+        asDictionary[i] = [signal asDictionary];
         md5Lists[i] = [asDictionary[i][@"name"] md5];
         NSString *type = asDictionary[i][@"custom"][@"type"];
 
@@ -98,14 +81,13 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
                 dir = [[dir componentsSeparatedByString:@"/"] lastObject];
             }
             NSString *path = [NSString stringWithFormat:@"%@/%@/120.png", [NSHomeDirectory() stringByAppendingPathComponent:@"Documents"], dir];
-            image = MakeCornerRoundImage([UIImage imageWithContentsOfFile:path]);
+            image = [[UIImage imageWithContentsOfFile:path] makeCornerRoundImage];
         }
         images[i] = [[NSData alloc] initWithData:UIImagePNGRepresentation(image)];
     }
 
     [asDictionary writeToFile:PREFS_PATH atomically:YES];
     [images writeToFile:IMAGE_PREFS_PATH atomically:YES];
-    [md5Lists writeToFile:MD5_PREFS_PATH atomically:YES];
 
     [OBJCIPC sendMessageToSpringBoardWithMessageName:@"IRKitSubstrate_Activator_UpdateListeners" dictionary:nil replyHandler:nil];
     [[[UIAlertView alloc] initWithTitle:@"Export!" message:@"Output complete the data to be used to IRKit for Activator." delegate:nil cancelButtonTitle:@"Yep!" otherButtonTitles:nil] show];
@@ -115,18 +97,18 @@ static inline UIImage * MakeCornerRoundImage(UIImage *image)
 %new
 - (void)exportOSXLauncherSettings
 {
-    IRSignals *_signals = [[%c(IRSignals) alloc] init];
-    [_signals loadFromStandardUserDefaultsKey:@"signals"];
+    IRSignals *signals = [[%c(IRSignals) alloc] init];
+    [signals loadFromStandardUserDefaultsKey:@"signals"];
 
-    for (unsigned int i = 0; i < [_signals countOfSignals]; i++) {
-        IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
+    for (unsigned int i = 0; i < [signals countOfSignals]; i++) {
+        IRSignal *signal =  [signals objectInSignalsAtIndex:i];
 
         NSError *error = nil;
 
         NSCharacterSet* illegalFileNameCharacters = [NSCharacterSet characterSetWithCharactersInString: @"/\\?%*|\"<>"];
-        NSString *safename = [[_signal.name componentsSeparatedByCharactersInSet: illegalFileNameCharacters] componentsJoinedByString: @""];
+        NSString *safename = [[signal.name componentsSeparatedByCharactersInSet: illegalFileNameCharacters] componentsJoinedByString: @""];
 
-        NSData *json = [NSJSONSerialization dataWithJSONObject:[_signal asDictionary] options:NSJSONWritingPrettyPrinted error:&error];
+        NSData *json = [NSJSONSerialization dataWithJSONObject:[signal asDictionary] options:NSJSONWritingPrettyPrinted error:&error];
         if (error) {
             NSLog( @"failed with error: %@", error );
         }
@@ -161,25 +143,25 @@ static inline __attribute__((constructor)) void init()
         [OBJCIPC registerIncomingMessageFromSpringBoardHandlerForMessageName:@"IRKitSimple_Activator" handler:^NSDictionary *(NSDictionary *dict) {
             NSString *action = dict[@"action"];
             if ([action isEqualToString:@"send_signal"]) {
-                IRSignals *_signals = [[%c(IRSignals) alloc] init];
-                [_signals loadFromStandardUserDefaultsKey:@"signals"];
+                IRSignals *signals = [[%c(IRSignals) alloc] init];
+                [signals loadFromStandardUserDefaultsKey:@"signals"];
 
                 int index = -1;
                 NSMutableArray *asDictionary = [NSMutableArray array];
-                for (unsigned int i = 0; i < [_signals countOfSignals]; i++) {
-                    IRSignal *_signal =  [_signals objectInSignalsAtIndex:i];
-                    asDictionary[i] = [_signal asDictionary];
+                for (unsigned int i = 0; i < [signals countOfSignals]; i++) {
+                    IRSignal *signal =  [signals objectInSignalsAtIndex:i];
+                    asDictionary[i] = [signal asDictionary];
                     if ([dict[@"md5"] isEqualToString:[asDictionary[i][@"name"] md5]]) {
                         index = i;
                     }
                 }
-                NSLog(@"%s: success index: %d", __func__, index);
+                
                 if (index == -1) {
                     return @{ @"success": @(NO) };
                 }
-                IRSignal *_signal =  [_signals objectInSignalsAtIndex:index];
+                IRSignal *signal =  [signals objectInSignalsAtIndex:index];
 
-                [_signal sendWithCompletion:^(NSError *error) {
+                [signal sendWithCompletion:^(NSError *error) {
                     if (!error) {
                         NSLog( @"sent with error: %@", error );
                     }

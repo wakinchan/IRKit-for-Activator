@@ -6,7 +6,7 @@ include /opt/theos/makefiles/common.mk
 
 TWEAK_NAME = IRKitforActivator
 IRKitforActivator_FILES = Tweak.xm UIImage+IRKit.m NSString+Hashes.m
-IRKitforActivator_FRAMEWORKS = UIKit
+IRKitforActivator_FRAMEWORKS = UIKit QuartzCore
 IRKitforActivator_LIBRARIES = objcipc
 IRKitforActivator_LDFLAGS = -lactivator
 IRKitforActivator_CFLAGS = -fobjc-arc

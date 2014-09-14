@@ -17,27 +17,28 @@
 
 #define PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.plist"
 #define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.images.plist"
-#define BundleIdentifier @"jp.maaash.simpleremote"
 
 @interface IRKitforActivator : NSObject <LAListener> {
-    NSArray *_dictionary;
-    NSMutableArray *_md5Lists;
+    NSMutableArray *_md5s;
 }
 - (void)register;
-- (void)getSignals;
+- (NSArray *)getSignals;
+- (NSArray *)getImages;
 - (void)removeCurrentListeners;
 - (void)sendSignal:(NSString *)signalName;
 - (UIImage *)getSignalImage:(NSString *)listenerName;
 - (NSString *)getSignalTitile:(NSString *)listenerName;
+- (void)showBanner:(BOOL)success forListenerName:(NSString *)listenerName;
 @end
 
-static NSString *prefixName = @"com.kindadev.activator.irkit";
+static const char *bundleIdentifier = "jp.maaash.simpleremote";
+static const char *prefixName = "com.kindadev.activator.irkit";
 static IRKitforActivator *irkit = nil;
 
 @implementation IRKitforActivator
 + (void)load
 {
-    irkit = [[self alloc] init];
+    irkit = [[IRKitforActivator alloc] init];
     [irkit register];
 
     __weak IRKitforActivator *weakSelf = irkit;
@@ -50,58 +51,73 @@ static IRKitforActivator *irkit = nil;
 
 - (void)register
 {
-    [self getSignals];
-    _md5Lists = [NSMutableArray array];
-    for (unsigned int i = 0; i < [_dictionary count]; i++) {
-        NSString *name = [NSString stringWithFormat:@"%@_%@", prefixName, [_dictionary[i][@"name"] md5]];
-        _md5Lists[i] = name;
+    NSArray *signals = [self getSignals];
+    _md5s = [NSMutableArray array];
+    for (unsigned int i = 0; i < [signals count]; i++) {
+        NSString *name = [NSString stringWithFormat:@"%s_%@", prefixName, [signals[i][@"name"] md5]];
+        _md5s[i] = name;
         if ([LASharedActivator isRunningInsideSpringBoard]) {
-            [LASharedActivator registerListener:irkit forName:name];
+            [LASharedActivator registerListener:self forName:name];
         }
     }
 }
 
-- (void)getSignals
+- (void)dealloc
 {
-    NSArray *dictionary = [[NSArray alloc] initWithContentsOfFile:PREFS_PATH];
-    _dictionary = [dictionary copy];
-}
-
-- (void)removeCurrentListeners
-{
-    if (![LASharedActivator isRunningInsideSpringBoard])
-        return;
-    for (NSString *name in _md5Lists) {
+    for (NSString *name in _md5s) {
         if ([LASharedActivator hasListenerWithName:name]) {
             [LASharedActivator unregisterListenerWithName:name];
         }
     }
 }
 
-- (void)showBanner:(BOOL)success listenerName:(NSString *)listenerName
+- (NSArray *)getSignals
+{
+    return [NSArray arrayWithContentsOfFile:PREFS_PATH];
+}
+
+- (NSArray *)getImages
+{
+    return [NSArray arrayWithContentsOfFile:IMAGE_PREFS_PATH];
+}
+
+- (void)removeCurrentListeners
+{
+    if (![LASharedActivator isRunningInsideSpringBoard]) {
+        return;
+    }
+    for (NSString *name in _md5s) {
+        if ([LASharedActivator hasListenerWithName:name]) {
+            [LASharedActivator unregisterListenerWithName:name];
+        }
+    }
+}
+
+- (void)showBanner:(BOOL)success forListenerName:(NSString *)listenerName
 {
     BBBulletinRequest *bulletin = [[%c(BBBulletinRequest) alloc] init];
-    bulletin.title     = [self getSignalTitile:listenerName];
-    bulletin.message   = success ? @"send successfully!" : @"send failed!"; 
-    bulletin.sectionID = BundleIdentifier;
+    bulletin.title = [self getSignalTitile:listenerName];
+    bulletin.message = success ? @"send successfully!" : @"send failed!"; 
+    bulletin.sectionID = [NSString stringWithUTF8String:bundleIdentifier];
     [(SBBulletinBannerController *)[%c(SBBulletinBannerController) sharedInstance] observer:nil addBulletin:bulletin forFeed:2];
 }
 
 - (void)sendSignal:(NSString *)signalName
 {
     NSDictionary *dict = @{ @"action": @"send_signal", @"md5" : [signalName substringFromIndex:29] };
-    [OBJCIPC sendMessageToAppWithIdentifier:BundleIdentifier messageName:@"IRKitSimple_Activator" dictionary:dict replyHandler:^(NSDictionary *reply) {
+    [OBJCIPC sendMessageToAppWithIdentifier:[NSString stringWithUTF8String:bundleIdentifier] messageName:@"IRKitSimple_Activator" dictionary:dict replyHandler:^(NSDictionary *reply) {
         BOOL success = [reply[@"success"] boolValue];
-        [self showBanner:success listenerName:signalName];
+        [self showBanner:success forListenerName:signalName];
     }];
 }
 
 - (NSString *)getSignalTitile:(NSString *)listenerName
 {
     NSString *title = @"";
-    for (unsigned int i = 0; i < [_dictionary count]; i++) {
-        if ([listenerName isEqualToString:_md5Lists[i]]) {
-            title = _dictionary[i][@"name"];
+    NSArray *signals = [self getSignals];
+    for (unsigned int i = 0; i < [signals count]; i++) {
+        if ([listenerName isEqualToString:_md5s[i]]) {
+            title = signals[i][@"name"];
         }
     }
     return title;
@@ -110,9 +126,10 @@ static IRKitforActivator *irkit = nil;
 - (UIImage *)getSignalImage:(NSString *)listenerName
 {
     NSData *data = nil;
-    NSArray *images = [[NSArray alloc] initWithContentsOfFile:IMAGE_PREFS_PATH];
-    for (unsigned int i = 0; i < [_dictionary count]; i++) {
-        if ([listenerName isEqualToString:_md5Lists[i]]) {
+    NSArray *signals = [self getSignals];
+    NSArray *images = [self getImages];
+    for (unsigned int i = 0; i < [signals count]; i++) {
+        if ([listenerName isEqualToString:_md5s[i]]) {
             data = images[i];
         }
     }
@@ -155,4 +172,3 @@ static IRKitforActivator *irkit = nil;
     return [[self getSignalImage:listenerName] makeThumbnailOfSize:CGSizeMake(18*scale,18*scale)];
 }
 @end
-
