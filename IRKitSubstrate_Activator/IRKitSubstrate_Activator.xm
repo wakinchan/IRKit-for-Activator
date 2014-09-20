@@ -13,9 +13,10 @@
 #import "../NSString+Hashes.h"
 #import "../UIImage+IRKit.h"
 
-#define PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.plist"
-#define IMAGE_PREFS_PATH @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.images.plist"
 #define SIGNALS_DIRECTORY [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/IRLauncher/"]
+
+static NSString * const kPreferencePath = @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.plist";
+static NSString * const kImagePreferencePath = @"/var/mobile/Library/Preferences/com.kindadev.activator.irkit.images.plist";
 
 @interface SSSettingsViewController : UITableViewController <UIActionSheetDelegate>
 - (void)exportIRKitSettings;
@@ -61,22 +62,26 @@
     IRSignals *signals = [[%c(IRSignals) alloc] init];
     [signals loadFromStandardUserDefaultsKey:@"signals"];
     
-    NSMutableArray *asDictionary = [NSMutableArray array];
+    NSMutableArray *data = [NSMutableArray array];
     NSMutableArray *images = [NSMutableArray array];
     NSMutableArray *md5Lists = [NSMutableArray array];
     for (unsigned int i = 0; i < [signals countOfSignals]; i++) {
         IRSignal *signal =  [signals objectInSignalsAtIndex:i];
-        asDictionary[i] = [signal asDictionary];
-        md5Lists[i] = [asDictionary[i][@"name"] md5];
-        NSString *type = asDictionary[i][@"custom"][@"type"];
+        
+        NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+        dict = [[signal asDictionary] mutableCopy];
+        data[i] = dict;
+
+        md5Lists[i] = [data[i][@"name"] md5];
+        NSString *type = data[i][@"custom"][@"type"];
 
         UIImage *image = [UIImage new];
         if ([type isEqualToString:@"preset"]) {
-            NSString *name = asDictionary[i][@"custom"][@"name"];
+            NSString *name = data[i][@"custom"][@"name"];
             image = [UIImage imageNamed:[NSString stringWithFormat:@"btn_icon_120_%@", name]];
             
         } else if ([type isEqualToString:@"album"]) {
-            NSString *dir = asDictionary[i][@"custom"][@"dir"];
+            NSString *dir = data[i][@"custom"][@"dir"];
             if ([dir hasPrefix:@"/var/mobile/Applications/"]) {
                 dir = [[dir componentsSeparatedByString:@"/"] lastObject];
             }
@@ -85,10 +90,9 @@
         }
         images[i] = [[NSData alloc] initWithData:UIImagePNGRepresentation(image)];
     }
-
-    [asDictionary writeToFile:PREFS_PATH atomically:YES];
-    [images writeToFile:IMAGE_PREFS_PATH atomically:YES];
-
+    [data writeToFile:kPreferencePath atomically:YES];
+    [images writeToFile:kImagePreferencePath atomically:YES];
+    
     [OBJCIPC sendMessageToSpringBoardWithMessageName:@"IRKitSubstrate_Activator_UpdateListeners" dictionary:nil replyHandler:nil];
     [[[UIAlertView alloc] initWithTitle:@"Export!" message:@"Output complete the data to be used to IRKit for Activator." delegate:nil cancelButtonTitle:@"Yep!" otherButtonTitles:nil] show];
 }
@@ -161,11 +165,18 @@ static inline __attribute__((constructor)) void init()
                 }
                 IRSignal *signal =  [signals objectInSignalsAtIndex:index];
 
+                __block BOOL isSendFailed = NO;
                 [signal sendWithCompletion:^(NSError *error) {
-                    if (!error) {
+                    if (error != nil) {
+                        isSendFailed = YES;
                         NSLog( @"sent with error: %@", error );
+                        
                     }
                 }];
+                if (isSendFailed) {
+                    return @{ @"success": @(NO) };
+                }
+
                 return @{ @"success": @(YES) };
             }
             
