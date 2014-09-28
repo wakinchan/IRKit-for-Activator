@@ -54,7 +54,6 @@ static BOOL isOperationNotPermitted = NO;
 - (void)registerListeners
 {
     NSArray *signals = [self getSignals];
-    NSLog(@"%s] signals: %@", __func__, signals);
     self.md5s = [NSMutableArray array];
     for (unsigned int i = 0; i < [signals count]; i++) {
         NSString *name = [NSString stringWithFormat:@"%@_%@", kPrefixName, [signals[i][@"name"] md5]];
